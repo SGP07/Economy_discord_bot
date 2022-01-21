@@ -9,7 +9,7 @@ from datetime import timedelta
 os.chdir('Z:\\Documents\\Files\\Dev\\bushicro\\bushicro')
 
 print("Loading...")
-bot = commands.Bot(command_prefix='!')
+bot = commands.Bot(command_prefix='!', case_insensitive=True)
 bot.remove_command('help')
 
 
@@ -70,7 +70,9 @@ async def beg(ctx):
 
     #generating random earnings
     earnings = random.randrange(101)
-    await ctx.send(f'Someone gave you {earnings} coins !!')
+    em = discord.Embed(title=f"Donation !",description=f'Someone gave you {earnings} coins !!', color=discord.Color.green())
+    await ctx.send(embed=em)
+    
     
     #storing earnings in the wallet
     users[str(user.id)]["wallet"] += earnings
@@ -85,7 +87,8 @@ async def withdraw(ctx, amount=None):
     await open_account(ctx.author)
 
     if amount == None:
-        await ctx.send("Please enter the amount")
+        em = discord.Embed(title=f" ❌ Error!",description="Please enter the amount", color=0xe74c3c)
+        await ctx.send(embed=em)
         return
 
     bal = await update_bank(ctx.author)
@@ -93,17 +96,21 @@ async def withdraw(ctx, amount=None):
     if amount == 'all':
         amount = bal[1]
     if int(amount) > bal[1]:
-        await ctx.send("You don't have enough money")
+        em = discord.Embed(title=f" ❌ Error!",description="You don't have enough money", color=0xe74c3c)
+        await ctx.send(embed=em)
         return
     if int(amount) < 0:
-        await ctx.send("Ammount must be positive")
+        em = discord.Embed(title=f" ❌ Error!",description="The amount must be positive", color=0xe74c3c)
+        await ctx.send(embed=em)
         return
     amount = int(amount)
     
     await update_bank(ctx.author, amount) #adding the ammount to the wallet
     await update_bank(ctx.author, -1*amount, 'bank') #substracting the amount from the bank
     #sending the message
-    await ctx.send(f"You withdrew {amount} coins")
+    em = discord.Embed(title=f"Withdrawal",description=f'You withdrew {amount} coins', color=discord.Color.green())
+    await ctx.send(embed=em)
+    
 
 #deposit command
 @bot.command()
@@ -111,7 +118,8 @@ async def deposit(ctx, amount=None):
     await open_account(ctx.author)
 
     if amount == None:
-        await ctx.send("Please enter the amount")
+        em = discord.Embed(title=f" ❌ Error!",description="Please enter the amount", color=0xe74c3c)
+        await ctx.send(embed=em)
         return
 
     bal = await update_bank(ctx.author)
@@ -119,17 +127,22 @@ async def deposit(ctx, amount=None):
     if amount == 'all':
         amount = bal[0]
     if int(amount) > bal[0]:
-        await ctx.send("You don't have enough money")
+        em = discord.Embed(title="❌ Error!",description="You don't have enough money", color=0xe74c3c)
+        await ctx.send(embed=em)
         return
     if int(amount) < 0:
-        await ctx.send("Ammount must be positive")
+        em = discord.Embed(title="❌ Error!",description="The amount must be positive", color=0xe74c3c)
+        await ctx.send(embed=em)
         return
+
     amount = int(amount)
     
     await update_bank(ctx.author, -1*amount) #substracting the ammount from the wallet
     await update_bank(ctx.author, amount, 'bank') #adding the amount to the bank
     #sending the message
-    await ctx.send(f"You deposited {amount} coins")
+    em = discord.Embed(title="Deposit",description=f"You deposited {amount} coins", color=discord.Color.green())
+    await ctx.send(embed=em)
+    
 
 #send command
 @bot.command()
@@ -138,7 +151,8 @@ async def send(ctx, member: discord.Member ,amount=None):
     await open_account(member)
 
     if amount == None:
-        await ctx.send("Please enter the amount")
+        em = discord.Embed(title=f" ❌ Error!",description="Please enter the amount", color=0xe74c3c)
+        await ctx.send(embed=em)
         return
 
     bal = await update_bank(ctx.author)
@@ -146,18 +160,21 @@ async def send(ctx, member: discord.Member ,amount=None):
     if amount == 'all':
         amount = bal[1]
     if int(amount) > bal[1]:
-        await ctx.send("You don't have enough money in your bank")
+        em = discord.Embed(title=f" ❌ Error!",description="You don't have enough money", color=0xe74c3c)
+        await ctx.send(embed=em)
         return
     if int(amount) < 0:
-        await ctx.send("Ammount must be positive")
+        em = discord.Embed(title=f" ❌ Error!",description="The amount must be positive", color=0xe74c3c)
+        await ctx.send(embed=em)
         return
     amount = int(amount)
     
     await update_bank(ctx.author, -1*amount, 'bank') #substracting the ammount from the bank of the author
     await update_bank(member, amount, 'bank') #adding the amount to the bank of the member
     #sending the message
-    await ctx.send(f"You gave {amount} coins")
-
+    em = discord.Embed(title=f"Money transfer",description=f'You gave {amount} coins', color=discord.Color.green())
+    await ctx.send(embed=em)
+    
 #rob command
 @bot.command()
 async def rob(ctx, member: discord.Member):
@@ -180,26 +197,32 @@ async def rob(ctx, member: discord.Member):
 
     if random.randint(1 , 100) in range(prob +1):
         fine = random.randint(100,200)
-        await ctx.send(f"You were caught and fined {fine} coin ")
+        em = discord.Embed(title=f"You were caught!",description=f"You were caught trying to steal from your fellow warrior and have had {fine} coins taken from you. Next time they will take your head.", color=0xe74c3c)
+        await ctx.send(embed=em)
         await update_bank(ctx.author, -1*fine) #substracting the ammount from the wallet of the member
 
     
     else :
         earning = suc*(bal[0]/100)
         if earning > bal[0]:
-            earning = bal[0]      
-
+            earning = bal[0]     
+         
+        earning = int(earning)
         await update_bank(ctx.author, earning) #adding the amount to the wallet of the author
         await update_bank(member, -1*earning) #substracting the ammount from the wallet of the member
         #sending the message
-        await ctx.send(f"You robbed and got {earning} coins")
+        em = discord.Embed(title="Thief",description=f"You robbed and got {earning} coins", color=discord.Color.green())
+        await ctx.send(embed=em)
+        
 
+#slots command
 @bot.command()
 async def slots(ctx, amount=None):
     await open_account(ctx.author)
 
     if amount == None:
-        await ctx.send("Please enter the amount")
+        em = discord.Embed(title=f" ❌ Error!",description="Please enter the amount", color=0xe74c3c)
+        await ctx.send(embed=em)
         return
 
     bal = await update_bank(ctx.author)
@@ -207,17 +230,19 @@ async def slots(ctx, amount=None):
     if amount == 'all':
         amount = bal[0]
     if int(amount) > bal[0]:
-        await ctx.send("You don't have enough money")
+        em = discord.Embed(title=f" ❌ Error!",description="You don't have enough money", color=0xe74c3c)
+        await ctx.send(embed=em)
         return
     if int(amount) < 0:
-        await ctx.send("Ammount must be positive")
+        em = discord.Embed(title=f" ❌ Error!",description="The amount must be positive", color=0xe74c3c)
+        await ctx.send(embed=em)
         return
     amount = int(amount)
 
     final = []
     #generating slot results
     for i in range(3):
-        a = random.choice(['🐱‍👤', '🗡', '⚔', '👺','🏯'])
+        a = random.choice(['🎌', '🗡', '⚔', '👺','🏯'])
         final.append(a)
         i+=1
     #sending slots result
@@ -236,16 +261,16 @@ async def work(ctx):
     await open_account(ctx.author)
     
     #list of jobs with salarys
-    jobs= [{"task":"shined the Ninja’s swords",'salary':500},
-            {"task":"served food at a restaurant",'salary':300},
-            {"task":"did something cool",'salary':800}]
+    jobs = ["shined the Ninja’s swords","served food at a restaurant","helped the samurai carry a severed head"]
+
     #generating random number to chose a task
-    e = random.randrange(3)
-    task, salary= jobs[e]['task'], jobs[e]['salary']
+    task, salary= random.choice(jobs), random.randint(300,600)
 
     await update_bank(ctx.author, salary, 'bank') #adding the salary to the bank of the user
     #sending the message
-    await ctx.send(f"You {task} and earned {salary} coins")
+    em = discord.Embed(title=f"You earned money",description=f"You {task} and earned {salary} coins", color=discord.Color.green())
+    await ctx.send(embed=em)
+    
     
 #error beg
 @beg.error
