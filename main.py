@@ -6,6 +6,7 @@ import json
 import os
 from datetime import timedelta
 
+
 os.chdir('Z:\\Documents\\Files\\Dev\\bushicro\\bushicro')
 
 print("Loading...")
@@ -255,6 +256,7 @@ async def slots(ctx, amount=None):
         await ctx.send('You lost')
         await update_bank(ctx.author, -1*amount)
 
+#work command
 @bot.command()
 @commands.cooldown(1, 1800, commands.BucketType.user) #use the command once every 30min (1800sec)
 async def work(ctx):
@@ -271,7 +273,75 @@ async def work(ctx):
     em = discord.Embed(title=f"You earned money",description=f"You {task} and earned {salary} coins", color=discord.Color.green())
     await ctx.send(embed=em)
     
+
+
+#battle command
+@bot.command()
+@commands.cooldown(1, 15, commands.BucketType.user) #use the command once every 30min (1800sec)
+async def battle(ctx, member: discord.Member ,amount=None):
+    await open_account(ctx.author)
+    await open_account(member)
+
+    if amount == None:
+        em = discord.Embed(title=f" ❌ Error!",description="Please enter the amount", color=0xe74c3c)
+        await ctx.send(embed=em)
+        return
+
+    bal = await update_bank(ctx.author)
+    bal2 = await update_bank(member)
+
+    if amount == 'all':
+        amount = bal[0]
+    if int(amount) > bal[0]:
+        em = discord.Embed(title=f" ❌ Error!",description="You don't have enough money", color=0xe74c3c)
+        await ctx.send(embed=em)
+        return
+    if int(amount) < 0:
+        em = discord.Embed(title=f" ❌ Error!",description="The amount must be positive", color=0xe74c3c)
+        await ctx.send(embed=em)
+        return
+    if int(amount) > bal2[0]:
+        em = discord.Embed(title=f" ❌ Error!",description=f"{member.mention} does not have enough money", color=0xe74c3c)
+        await ctx.send(embed=em)
+        return
     
+    amount = int(amount)
+
+    #sending challenge message
+    em = discord.Embed(title=f"Challenge ⚔",description=f"{ctx.author.mention} challenged {member.mention} to a fight, the winner will get {amount} coins from the looser.\n Do you accept the challenge ? you have 30sec to decide(send y or n)", color=discord.Color.purple())
+    await ctx.send(embed=em)
+
+    def check(m):
+        return m.author ==member and m.channel == ctx.channel
+
+    try :
+        message = await bot.wait_for('message',check=check, timeout=30.0)
+        if message.content.lower()=='y':
+            if random.randrange(2) == 0 : #author wins
+                em = discord.Embed(title=f"{ctx.author.name} won",description=f"{ctx.author.mention} won and earned {amount} coins", color=discord.Color.green())
+                await ctx.channel.send(embed=em)
+                await update_bank(ctx.author, amount) #adding the amount to the wallet of the author
+                await update_bank(member, -1*amount) #substracting the ammount from the wallet of the member
+                return
+            else : #memebr wins
+                em = discord.Embed(title=f"{member.display_name} won",description=f"{member.mention} won and earned {amount} coins", color=discord.Color.green())
+                await ctx.channel.send(embed=em)
+                await update_bank(member, amount) #adding the amount to the wallet of the member
+                await update_bank(ctx.author, -1*amount) #substracting the ammount from the wallet of the author
+                return
+        elif message.content.lower()=='n':
+            em = discord.Embed(title=f"Challenged declined!",description=f"{member.mention} Declined the challenge", color=0xe74c3c)
+            await ctx.send(embed=em)
+            return
+
+    except asyncio.TimeoutError:
+        em = discord.Embed(title=f" ❌ Error!",description=f"{member.mention} did not respond", color=0xe74c3c)
+        await ctx.channel.send(embed=em)
+
+      
+            
+
+
 #error beg
 @beg.error
 async def beg(ctx, error):
@@ -289,8 +359,16 @@ async def work(ctx, error):
         t = float("{:.2f}".format(error.retry_after))
         t = str(timedelta(seconds=t))[2:7].replace(':','min')
         em = discord.Embed(title=f"Slow it down !",description=f"You can use this command once every 30mins.\n Try again in {t}s.", color=0xe74c3c)
-        await ctx.send(embed=em)
+        await ctx.send(embed=em) 
 
+#error battle
+@battle.error
+async def battle(ctx, error):
+    if isinstance(error, commands.CommandOnCooldown):
+        t = float("{:.2f}".format(error.retry_after))
+        t = str(timedelta(seconds=t))[2:7].replace(':','min')
+        em = discord.Embed(title=f"Slow it down !",description=f"You can use this command once every 30mins.\n Try again in {t}s.", color=0xe74c3c)
+        await ctx.send(embed=em)
 
 
 
