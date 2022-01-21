@@ -4,8 +4,9 @@ import asyncio
 import random
 import json
 import os
+from datetime import timedelta
 
-os.chdir('')#path
+os.chdir('Z:\\Documents\\Files\\Dev\\bushicro\\bushicro')
 
 print("Loading...")
 bot = commands.Bot(command_prefix='!')
@@ -61,6 +62,7 @@ async def balance(ctx):
 
 #beg command
 @bot.command()
+@commands.cooldown(1, 1800, commands.BucketType.user) #use command once every 30min (1800sec)
 async def beg(ctx):
     await open_account(ctx.author)
     users = await get_bank_data()
@@ -163,17 +165,34 @@ async def rob(ctx, member: discord.Member):
     await open_account(member)
 
     bal = await update_bank(member)
-
-    if bal[0] < 100 or bal[0]:
+    bal2 = await update_bank(ctx.author)
+    if bal[0] < 100 or bal[0]== 0:
         await ctx.send("This guy is broke, robbing him isn't worth the risk")
         return
-
-    earning = random.randrange(0, bal[0])
     
-    await update_bank(ctx.author, earning) #adding the amount to the walletof the author
-    await update_bank(member, -1*earning) #substracting the ammount from the wallet of the member
-    #sending the message
-    await ctx.send(f"You robbed and got {earning} coins")
+    net = bal2[0]+bal2[1]
+
+    prob = net/(bal[0]+net)
+    prob = int(prob * 100)
+    suc = 100-prob
+    
+    print(suc)  
+
+    if random.randint(1 , 100) in range(prob +1):
+        fine = random.randint(100,200)
+        await ctx.send(f"You were caught and fined {fine} coin ")
+        await update_bank(ctx.author, -1*fine) #substracting the ammount from the wallet of the member
+
+    
+    else :
+        earning = suc*(bal[0]/100)
+        if earning > bal[0]:
+            earning = bal[0]      
+
+        await update_bank(ctx.author, earning) #adding the amount to the wallet of the author
+        await update_bank(member, -1*earning) #substracting the ammount from the wallet of the member
+        #sending the message
+        await ctx.send(f"You robbed and got {earning} coins")
 
 @bot.command()
 async def slots(ctx, amount=None):
@@ -198,7 +217,7 @@ async def slots(ctx, amount=None):
     final = []
     #generating slot results
     for i in range(3):
-        a = random.choice(['🎰', '🍋', '🍒', '🍓','🍇'])
+        a = random.choice(['🐱‍👤', '🗡', '⚔', '👺','🏯'])
         final.append(a)
         i+=1
     #sending slots result
@@ -210,6 +229,42 @@ async def slots(ctx, amount=None):
     else:
         await ctx.send('You lost')
         await update_bank(ctx.author, -1*amount)
+
+@bot.command()
+@commands.cooldown(1, 1800, commands.BucketType.user) #use the command once every 30min (1800sec)
+async def work(ctx):
+    await open_account(ctx.author)
+    
+    #list of jobs with salarys
+    jobs= [{"task":"shined the Ninja’s swords",'salary':500},
+            {"task":"served food at a restaurant",'salary':300},
+            {"task":"did something cool",'salary':800}]
+    #generating random number to chose a task
+    e = random.randrange(3)
+    task, salary= jobs[e]['task'], jobs[e]['salary']
+
+    await update_bank(ctx.author, salary, 'bank') #adding the salary to the bank of the user
+    #sending the message
+    await ctx.send(f"You {task} and earned {salary} coins")
+    
+#error beg
+@beg.error
+async def beg(ctx, error):
+    if isinstance(error, commands.CommandOnCooldown):
+        t = float("{:.2f}".format(error.retry_after))
+        t = str(timedelta(seconds=t))[2:7].replace(':','min')
+        em = discord.Embed(title=f"Slow it down !",description=f"You can use this command once every 30mins.\n Try again in {t}s.", color=0xe74c3c)
+        await ctx.send(embed=em)
+
+
+#error work 
+@work.error
+async def work(ctx, error):
+    if isinstance(error, commands.CommandOnCooldown):
+        t = float("{:.2f}".format(error.retry_after))
+        t = str(timedelta(seconds=t))[2:7].replace(':','min')
+        em = discord.Embed(title=f"Slow it down !",description=f"You can use this command once every 30mins.\n Try again in {t}s.", color=0xe74c3c)
+        await ctx.send(embed=em)
 
 
 
