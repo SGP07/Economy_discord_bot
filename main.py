@@ -6,6 +6,8 @@ import json
 import os
 from datetime import timedelta
 
+from telegram import Bot
+
 
 os.chdir('Z:\\Documents\\Files\\Dev\\bushicro\\bushicro')
 
@@ -273,6 +275,40 @@ async def work(ctx):
     em = discord.Embed(title=f"You earned money",description=f"You {task} and earned {salary} coins", color=discord.Color.green())
     await ctx.send(embed=em)
     
+
+#leaderboard command
+@bot.command(aliases = ["lb"])
+async def leaderboard(ctx,x = 3):
+    if x > 20:
+        x = 20
+
+    users = await get_bank_data()
+    leader_board = {}
+    total = []
+    for user in users:
+        name = int(user)
+        total_amount = users[user]["wallet"] + users[user]["bank"]
+        leader_board[total_amount] = name
+        total.append(total_amount)
+
+    total = sorted(total,reverse=True)    
+
+    em = discord.Embed(title = f"Top {x} Richest People" , description = "This is decided on the basis of net worth in the bank and wallet",color = discord.Color(0xfa43ee))
+    index = 1
+    for amt in total:
+        id_ = leader_board[amt]
+        member = await bot.fetch_user(id_)
+        name = member.name
+        em.add_field(name = f"{index}. {name}" , value = f"{amt}",  inline = False)
+        if index == x:
+            break
+        else:
+            index += 1
+
+    await ctx.send(embed = em)
+
+
+
 
 
 #battle command
