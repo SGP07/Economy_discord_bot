@@ -250,7 +250,7 @@ async def slots(ctx, amount=None):
     await ctx.send(f"{final[0]}{final[1]}{final[2]}")
     
     if final[0]==final[1] or final[0]==final[2] or final[1]==final[2]:
-        await ctx.send('You won !')
+        await ctx.send(f'You won {2*amount} coins !')
         await update_bank(ctx.author, 2*amount) #adding double the amount to the wallet
     else:
         await ctx.send('You lost')
@@ -263,7 +263,7 @@ async def work(ctx):
     await open_account(ctx.author)
     
     #list of jobs with salarys
-    jobs = ["shined the Ninja’s swords","served food at a restaurant","helped the samurai carry a severed head"]
+    jobs = ["shined the Ninja’s swords","served food at a restaurant","helped the samurai carry a severed head", "helped some Rōnins learn the bushido",'raked the meditation garden','separated the white and black robes for washing','cleaned the dojo after training']
 
     #generating random number to chose a task
     task, salary= random.choice(jobs), random.randint(300,600)
