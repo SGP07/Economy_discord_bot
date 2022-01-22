@@ -6,9 +6,6 @@ import json
 import os
 from datetime import timedelta
 
-from telegram import Bot
-
-
 os.chdir('Z:\\Documents\\Files\\Dev\\bushicro\\bushicro')
 
 print("Loading...")
