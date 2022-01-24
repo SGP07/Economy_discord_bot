@@ -345,7 +345,7 @@ async def battle(ctx, member: discord.Member ,amount=None):
     await ctx.send(embed=em)
 
     def check(m):
-        return m.author ==member and m.channel == ctx.channel
+        return m.author ==member and m.channel == ctx.channel and m.content.lower() in ['y','n']
 
     try :
         message = await bot.wait_for('message',check=check, timeout=30.0)
