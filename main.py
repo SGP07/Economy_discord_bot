@@ -28,32 +28,6 @@ bot.remove_command('help')
 async def on_ready():
     print('Bot ready')
 
-emoji = '🔥' 
-
-#Giveaway command
-@bot.command()
-@commands.has_permissions(kick_members=True)
-async def giveaway(ctx, duration, *,prize: str):
-    embed = discord.Embed(title = 'Excalibur Quest', description = f'You can win {prize}, add {emoji}to participate', color = 0xe74c3c)
-    embed.set_footer(text = f'The quest will end in {duration}')
-
-    #sending message
-    msg = await ctx.send(embed = embed)
-    duration = convert(duration)
-    await asyncio.sleep(duration)
-
-    message = await ctx.channel.fetch_message(msg.id)
-    #getting the users 
-    users = await message.reactions[0].users().flatten()
-    users.pop(users.index(bot.user))
-
-    #Randomly choosing a winner
-    winner = random.choice(users)
-
-    #sending winner as a message
-    await ctx.send(f' Congratulations {winner.mention} won {prize}')
-
-
 
 #Balance command
 @bot.command(aliases=["bal"])
@@ -81,16 +55,17 @@ async def work(ctx):
     await open_account(ctx.author)
     
     #list of jobs with salarys
-    jobs = ["shined the Ninja’s swords","served food at a restaurant","helped the samurai carry a severed head", "helped some Rōnins learn the bushido",'raked the meditation garden','separated the white and black robes for washing','cleaned the dojo after training']
+    jobs = [  {"task": "Cleaned the toilet at KFC", "salary": 300},  {"task": "Walked dogs for a neighbor", "salary": 350},  {"task": "Performed a magic show for a birthday party", "salary": 400},  {"task": "Did stand-up comedy at a local club", "salary": 450},  {"task": "Completed a challenging escape room", "salary": 500},  {"task": "Tested rollercoasters at an amusement park", "salary": 550},  {"task": "Explored a haunted house", "salary": 575},  {"task": "Battled monsters in a virtual reality game", "salary": 600},  {"task": "Delivered food for a food delivery service", "salary": 325},  {"task": "Performed as a street musician", "salary": 375}]
+
 
     #generating random task with random salary
-    task, salary= random.choice(jobs), random.randint(300,600)
+    job = random.choice(jobs)
     
     #adding the salary to the bank of the user   
-    data.update_one({"_id":ctx.author.id}, {"$inc" : {"bank" : salary}}) 
+    data.update_one({"_id":ctx.author.id}, {"$inc" : {"bank" : job["salary"]}}) 
     
     #sending the message
-    em = discord.Embed(title="You earned money",description=f"You {task} and earned {salary} coins", color=discord.Color.green())
+    em = discord.Embed(title="You earned money",description=f"You {job['task']} and earned {job['salary']} coins", color=discord.Color.green())
     await ctx.send(embed=em)
  
 #error work 
