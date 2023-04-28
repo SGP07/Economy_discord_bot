@@ -1,36 +1,46 @@
+from pymongo import MongoClient
 import discord
 from discord.ext import commands
-import asyncio
-import random
-import json
 import os
+import random
 from datetime import timedelta
+import asyncio
+import re
 
-os.chdir('Z:\\Documents\\Files\\Dev\\bushicro\\bushicro')
+
+
+os.chdir('/home/sgp/Documents/Dev/bushicro')
+
+
+client = MongoClient("mongodb+srv://sgp:ZlftinxAqHT6HGXN@cluster0.ofvgrfi.mongodb.net/?retryWrites=true&w=majority")
+db = client["discord"]
+data = db["mainbank"]
+
 
 print("Loading...")
-bot = commands.Bot(command_prefix='!', case_insensitive=True)
+
+intents = intents = discord.Intents.all()
+bot = commands.Bot(command_prefix='!', case_insensitive=True, intents=intents)
 bot.remove_command('help')
 
-
-emoji = '🔥'
 
 @bot.event
 async def on_ready():
     print('Bot ready')
 
+emoji = '🔥' 
 
 #Giveaway command
 @bot.command()
 @commands.has_permissions(kick_members=True)
-async def giveaway(ctx, hours : int, *,prize: str):
-    embed = discord.Embed(title = 'Excalibur Quest', description = f'You can win {prize}, add {emoji} to participate', color = 0xe74c3c)
-    embed.set_footer(text = f'The quest will end in {hours} hours')
+async def giveaway(ctx, duration, *,prize: str):
+    embed = discord.Embed(title = 'Excalibur Quest', description = f'You can win {prize}, add {emoji}to participate', color = 0xe74c3c)
+    embed.set_footer(text = f'The quest will end in {duration}')
 
     #sending message
     msg = await ctx.send(embed = embed)
-    await msg.add_reaction(emoji)
-    await asyncio.sleep(hours*3600)
+    duration = convert(duration)
+    await asyncio.sleep(duration)
 
     message = await ctx.channel.fetch_message(msg.id)
     #getting the users 
@@ -46,74 +56,71 @@ async def giveaway(ctx, hours : int, *,prize: str):
 
 
 #Balance command
-@bot.command()
+@bot.command(aliases=["bal"])
 async def balance(ctx):
-    await open_account(ctx.author)
-    users = await get_bank_data()
-    user = ctx.author
+    
+    user = data.find_one({'_id':ctx.author.id})
 
-    wallet_amt = users[str(user.id)]["wallet"]
-    bank_amt = users[str(user.id)]["bank"]
+    if user == None:
+        data.insert_one({'_id':ctx.author.id, 'name': ctx.author.name, 'wallet': 0, 'bank': 0, 'pfp': ctx.author.avatar.url})
+        bal = [0,0]
 
-    em = discord.Embed(title= f"{ctx.author.name}'s balance", color=discord.Color.blue())
-    em.add_field(name ='Wallet balance', value=wallet_amt)
-    em.add_field(name= 'Bank balance', value=bank_amt)
+    else : 
+        user = data.find_one({'_id':ctx.author.id})
+        bal = user['wallet'], user['bank'] 
+
+    em = discord.Embed(title= f"{ctx.author.name}", color=discord.Color.blue())
+    em.add_field(name ='Wallet balance', value=bal[0])
+    em.add_field(name= 'Bank balance', value=bal[1])
     await ctx.send(embed=em)
+
+#work command
+@bot.command()
+@commands.cooldown(1, 1800, commands.BucketType.user) #use the command once every 30min (1800sec)
+async def work(ctx):
+    await open_account(ctx.author)
+    
+    #list of jobs with salarys
+    jobs = ["shined the Ninja’s swords","served food at a restaurant","helped the samurai carry a severed head", "helped some Rōnins learn the bushido",'raked the meditation garden','separated the white and black robes for washing','cleaned the dojo after training']
+
+    #generating random task with random salary
+    task, salary= random.choice(jobs), random.randint(300,600)
+    
+    #adding the salary to the bank of the user   
+    data.update_one({"_id":ctx.author.id}, {"$inc" : {"bank" : salary}}) 
+    
+    #sending the message
+    em = discord.Embed(title="You earned money",description=f"You {task} and earned {salary} coins", color=discord.Color.green())
+    await ctx.send(embed=em)
+ 
+#error work 
+@work.error
+async def work(ctx, error):
+    if isinstance(error, commands.CommandOnCooldown):
+        t = float("{:.2f}".format(error.retry_after))
+        t = str(timedelta(seconds=t))[2:7].replace(':','min')
+        em = discord.Embed(title=f"Slow it down !",description=f"You can use this command once every 30mins.\n Try again in {t}s.", color=0xe74c3c)
+        await ctx.send(embed=em)  
 
 #beg command
 @bot.command()
-@commands.cooldown(1, 1800, commands.BucketType.user) #use command once every 30min (1800sec)
+@commands.cooldown(1, 30, commands.BucketType.user) #use command once every 30min (1800sec)
 async def beg(ctx):
     await open_account(ctx.author)
-    users = await get_bank_data()
-    user = ctx.author
-
+    
     #generating random earnings
     earnings = random.randrange(101)
+
+    #storing earnings in the wallet
+    data.update_one({"_id":ctx.author.id}, {"$inc" : {'wallet' : earnings}})
+
+    #sending message
     em = discord.Embed(title=f"Donation !",description=f'Someone gave you {earnings} coins !!', color=discord.Color.green())
     await ctx.send(embed=em)
-    
-    
-    #storing earnings in the wallet
-    users[str(user.id)]["wallet"] += earnings
-    
-    #update bankdata
-    with open("mainbank.json", 'w') as f:
-        json.dump(users, f)
 
-#withdraw command
-@bot.command()
-async def withdraw(ctx, amount=None):
-    await open_account(ctx.author)
-
-    if amount == None:
-        em = discord.Embed(title=f" ❌ Error!",description="Please enter the amount", color=0xe74c3c)
-        await ctx.send(embed=em)
-        return
-
-    bal = await update_bank(ctx.author)
-
-    if amount == 'all':
-        amount = bal[1]
-    if int(amount) > bal[1]:
-        em = discord.Embed(title=f" ❌ Error!",description="You don't have enough money", color=0xe74c3c)
-        await ctx.send(embed=em)
-        return
-    if int(amount) < 0:
-        em = discord.Embed(title=f" ❌ Error!",description="The amount must be positive", color=0xe74c3c)
-        await ctx.send(embed=em)
-        return
-    amount = int(amount)
-    
-    await update_bank(ctx.author, amount) #adding the ammount to the wallet
-    await update_bank(ctx.author, -1*amount, 'bank') #substracting the amount from the bank
-    #sending the message
-    em = discord.Embed(title=f"Withdrawal",description=f'You withdrew {amount} coins', color=discord.Color.green())
-    await ctx.send(embed=em)
-    
 
 #deposit command
-@bot.command()
+@bot.command(aliases=['dep'])
 async def deposit(ctx, amount=None):
     await open_account(ctx.author)
 
@@ -122,27 +129,67 @@ async def deposit(ctx, amount=None):
         await ctx.send(embed=em)
         return
 
-    bal = await update_bank(ctx.author)
+    
+    bal = await get_balance(ctx.author)
+
 
     if amount == 'all':
         amount = bal[0]
-    if int(amount) > bal[0]:
-        em = discord.Embed(title="❌ Error!",description="You don't have enough money", color=0xe74c3c)
+    
+    amount = int(amount)
+
+    if amount > bal[0]:
+        em = discord.Embed(title=f" ❌ Error!",description="You don't have enough money", color=0xe74c3c)
         await ctx.send(embed=em)
         return
-    if int(amount) < 0:
-        em = discord.Embed(title="❌ Error!",description="The amount must be positive", color=0xe74c3c)
+    if amount < 0:
+        em = discord.Embed(title=f" ❌ Error!",description="The amount must be positive", color=0xe74c3c)
         await ctx.send(embed=em)
         return
 
-    amount = int(amount)
-    
-    await update_bank(ctx.author, -1*amount) #substracting the ammount from the wallet
-    await update_bank(ctx.author, amount, 'bank') #adding the amount to the bank
+    #make this in one line
+    data.update_one({"_id":ctx.author.id}, {"$inc" : {'wallet' : -amount}}) #substracting the ammount from the wallet
+    data.update_one({"_id":ctx.author.id}, {"$inc" : {'bank' : amount}}) #adding the amount to the bank
+  
     #sending the message
     em = discord.Embed(title="Deposit",description=f"You deposited {amount} coins", color=discord.Color.green())
     await ctx.send(embed=em)
+
+#withdraw command
+@bot.command(aliases=['with'])
+async def withdraw(ctx, amount=None):
+    await open_account(ctx.author)
+
+    if amount == None:
+        em = discord.Embed(title=f" ❌ Error!",description="Please enter the amount", color=0xe74c3c)
+        await ctx.send(embed=em)
+        return
+
     
+    bal = await get_balance(ctx.author)
+
+
+    if amount == 'all':
+        amount = bal[1]
+    
+    amount = int(amount)
+
+    if amount > bal[1]:
+        em = discord.Embed(title=f" ❌ Error!",description="You don't have enough money", color=0xe74c3c)
+        await ctx.send(embed=em)
+        return
+    if amount < 0:
+        em = discord.Embed(title=f" ❌ Error!",description="The amount must be positive", color=0xe74c3c)
+        await ctx.send(embed=em)
+        return
+
+    #make this in one line
+    data.update_one({"_id":ctx.author.id}, {"$inc" : {'bank' : -amount}}) #substracting the amount from the bank
+    data.update_one({"_id":ctx.author.id}, {"$inc" : {'wallet' : amount}}) #adding the ammount to the wallet
+
+    #sending the message
+    em = discord.Embed(title=f"Withdrawal",description=f'You withdrew {amount} coins', color=discord.Color.green())
+    await ctx.send(embed=em)
 
 #send command
 @bot.command()
@@ -155,25 +202,85 @@ async def send(ctx, member: discord.Member ,amount=None):
         await ctx.send(embed=em)
         return
 
-    bal = await update_bank(ctx.author)
+    bal = await get_balance(ctx.author)
 
     if amount == 'all':
         amount = bal[1]
-    if int(amount) > bal[1]:
+    
+    amount = int(amount)
+
+    if amount > bal[1]:
         em = discord.Embed(title=f" ❌ Error!",description="You don't have enough money", color=0xe74c3c)
         await ctx.send(embed=em)
         return
-    if int(amount) < 0:
+    if amount < 0:
         em = discord.Embed(title=f" ❌ Error!",description="The amount must be positive", color=0xe74c3c)
         await ctx.send(embed=em)
         return
-    amount = int(amount)
-    
-    await update_bank(ctx.author, -1*amount, 'bank') #substracting the ammount from the bank of the author
-    await update_bank(member, amount, 'bank') #adding the amount to the bank of the member
+        
+    data.update_one({'_id':ctx.author.id}, {'$inc':{'bank':-amount}}) #substracting the ammount from the bank of the author
+    data.update_one({'_id':member.id}, {'$inc':{'bank':amount}}) #adding the amount to the bank of the member
+  
     #sending the message
     em = discord.Embed(title=f"Money transfer",description=f'You gave {amount} coins', color=discord.Color.green())
     await ctx.send(embed=em)
+    
+
+#error beg
+@beg.error
+async def beg(ctx, error):
+    if isinstance(error, commands.CommandOnCooldown):
+        t = float("{:.2f}".format(error.retry_after))
+        t = str(timedelta(seconds=t))[2:7].replace(':','min')
+        em = discord.Embed(title=f"Slow it down !",description=f"You can use this command once every 30mins.\n Try again in {t}s.", color=0xe74c3c)
+        await ctx.send(embed=em)
+
+
+
+#slots command
+@bot.command(aliases=["slot"])
+async def slots(ctx, amount=None):
+    await open_account(ctx.author)
+
+    if amount == None:
+        em = discord.Embed(title=f" ❌ Error!",description="Please enter the amount", color=0xe74c3c)
+        await ctx.send(embed=em)
+        return
+
+    bal = await get_balance(ctx.author)
+
+    if amount == 'all':
+        amount = bal[0]
+    
+    amount = int(amount)
+    
+    if amount < 0:
+        em = discord.Embed(title=f" ❌ Error!",description="The amount must be positive", color=0xe74c3c)
+        await ctx.send(embed=em)
+        return
+    
+    if amount > bal[0]:
+        em = discord.Embed(title=f" ❌ Error!",description="You don't have enough money in your wallet", color=0xe74c3c)
+        await ctx.send(embed=em)
+        return
+
+    final = []
+    #generating slot results
+    for i in range(3):
+        a = random.choice(['🎌', '🗡', '⚔', '👺','🏯'])
+        final.append(a)
+        # i+=1
+    #sending slots result
+    await ctx.send(f"{final[0]}{final[1]}{final[2]}")
+    
+    if final[0]==final[1] or final[0]==final[2] or final[1]==final[2]:
+        await ctx.send(f'You won {amount} coins !')
+        data.update_one({"_id":ctx.author.id}, {"$inc" : {'wallet' : amount}}) #adding double the amount to the wallet
+    else:
+        await ctx.send('You lost')
+        data.update_one({"_id":ctx.author.id}, {"$inc" : {'wallet' : -amount}}) #removing the amount from the wallet
+
+
     
 #rob command
 @bot.command()
@@ -181,13 +288,14 @@ async def rob(ctx, member: discord.Member):
     await open_account(ctx.author)
     await open_account(member)
 
-    bal = await update_bank(member)
-    bal2 = await update_bank(ctx.author)
+    bal = await get_balance(member)
+    bal2 = await get_balance(ctx.author)
+        
     if bal[0] < 100 or bal[0]== 0:
         await ctx.send("This guy is broke, robbing him isn't worth the risk")
         return
     
-    net = bal2[0]+bal2[1]
+    net = sum(bal2)
 
     prob = net/(bal[0]+net)
     prob = int(prob * 100)
@@ -199,7 +307,7 @@ async def rob(ctx, member: discord.Member):
         fine = random.randint(100,200)
         em = discord.Embed(title=f"You were caught!",description=f"You were caught trying to steal from your fellow warrior and have had {fine} coins taken from you. Next time they will take your head.", color=0xe74c3c)
         await ctx.send(embed=em)
-        await update_bank(ctx.author, -1*fine) #substracting the ammount from the wallet of the member
+        data.update_one({"_id":ctx.author.id}, {"$inc" : {'wallet' : -fine}}) #substracting the ammount from the wallet of the author
 
     
     else :
@@ -208,70 +316,15 @@ async def rob(ctx, member: discord.Member):
             earning = bal[0]     
          
         earning = int(earning)
-        await update_bank(ctx.author, earning) #adding the amount to the wallet of the author
-        await update_bank(member, -1*earning) #substracting the ammount from the wallet of the member
+        data.update_one({"_id":ctx.author.id}, {"$inc" : {'wallet' : earning}}) #adding the amount to the wallet of the author
+        data.update_one({"_id":member.id}, {"$inc" : {'wallet' : -earning}}) #substracting the ammount from the wallet of the member         
+        
         #sending the message
         em = discord.Embed(title="Thief",description=f"You robbed and got {earning} coins", color=discord.Color.green())
         await ctx.send(embed=em)
-        
 
-#slots command
-@bot.command()
-async def slots(ctx, amount=None):
-    await open_account(ctx.author)
 
-    if amount == None:
-        em = discord.Embed(title=f" ❌ Error!",description="Please enter the amount", color=0xe74c3c)
-        await ctx.send(embed=em)
-        return
 
-    bal = await update_bank(ctx.author)
-
-    if amount == 'all':
-        amount = bal[0]
-    if int(amount) > bal[0]:
-        em = discord.Embed(title=f" ❌ Error!",description="You don't have enough money", color=0xe74c3c)
-        await ctx.send(embed=em)
-        return
-    if int(amount) < 0:
-        em = discord.Embed(title=f" ❌ Error!",description="The amount must be positive", color=0xe74c3c)
-        await ctx.send(embed=em)
-        return
-    amount = int(amount)
-
-    final = []
-    #generating slot results
-    for i in range(3):
-        a = random.choice(['🎌', '🗡', '⚔', '👺','🏯'])
-        final.append(a)
-        i+=1
-    #sending slots result
-    await ctx.send(f"{final[0]}{final[1]}{final[2]}")
-    
-    if final[0]==final[1] or final[0]==final[2] or final[1]==final[2]:
-        await ctx.send(f'You won {2*amount} coins !')
-        await update_bank(ctx.author, 2*amount) #adding double the amount to the wallet
-    else:
-        await ctx.send('You lost')
-        await update_bank(ctx.author, -1*amount)
-
-#work command
-@bot.command()
-@commands.cooldown(1, 1800, commands.BucketType.user) #use the command once every 30min (1800sec)
-async def work(ctx):
-    await open_account(ctx.author)
-    
-    #list of jobs with salarys
-    jobs = ["shined the Ninja’s swords","served food at a restaurant","helped the samurai carry a severed head", "helped some Rōnins learn the bushido",'raked the meditation garden','separated the white and black robes for washing','cleaned the dojo after training']
-
-    #generating random number to chose a task
-    task, salary= random.choice(jobs), random.randint(300,600)
-
-    await update_bank(ctx.author, salary, 'bank') #adding the salary to the bank of the user
-    #sending the message
-    em = discord.Embed(title=f"You earned money",description=f"You {task} and earned {salary} coins", color=discord.Color.green())
-    await ctx.send(embed=em)
-    
 
 #leaderboard command
 @bot.command(aliases = ["lb"])
@@ -279,12 +332,11 @@ async def leaderboard(ctx,x = 3):
     if x > 20:
         x = 20
 
-    users = await get_bank_data()
     leader_board = {}
     total = []
-    for user in users:
+    for user in data.find():
         name = int(user)
-        total_amount = users[user]["wallet"] + users[user]["bank"]
+        total_amount = data.find_one({"_id":id})['wallet'] + data.find_one({"_id":id})['bank']
         leader_board[total_amount] = name
         total.append(total_amount)
 
@@ -304,48 +356,46 @@ async def leaderboard(ctx,x = 3):
 
     await ctx.send(embed = em)
 
-
-
-
-
 #battle command
 @bot.command()
 @commands.cooldown(1, 15, commands.BucketType.user) #use the command once every 30min (1800sec)
 async def battle(ctx, member: discord.Member ,amount=None):
-    await open_account(ctx.author)
-    await open_account(member)
 
     if amount == None:
         em = discord.Embed(title=f" ❌ Error!",description="Please enter the amount", color=0xe74c3c)
         await ctx.send(embed=em)
         return
 
-    bal = await update_bank(ctx.author)
-    bal2 = await update_bank(member)
+    await open_account(ctx.author)
+    await open_account(member)
+
+    bal = await get_balance(ctx.author)
+    bal2 = await get_balance(member)
 
     if amount == 'all':
         amount = bal[0]
-    if int(amount) > bal[0]:
+
+    amount = int(amount) 
+    if amount > bal[0]:
         em = discord.Embed(title=f" ❌ Error!",description="You don't have enough money", color=0xe74c3c)
         await ctx.send(embed=em)
         return
-    if int(amount) < 0:
+    if amount < 0:
         em = discord.Embed(title=f" ❌ Error!",description="The amount must be positive", color=0xe74c3c)
         await ctx.send(embed=em)
         return
-    if int(amount) > bal2[0]:
+    if amount > bal2[0]:
         em = discord.Embed(title=f" ❌ Error!",description=f"{member.mention} does not have enough money", color=0xe74c3c)
         await ctx.send(embed=em)
         return
-    
-    amount = int(amount)
+
 
     #sending challenge message
     em = discord.Embed(title=f"Challenge ⚔",description=f"{ctx.author.mention} challenged {member.mention} to a fight, the winner will get {amount} coins from the looser.\n Do you accept the challenge ? you have 30sec to decide(send y or n)", color=discord.Color.purple())
     await ctx.send(embed=em)
 
     def check(m):
-        return m.author ==member and m.channel == ctx.channel and m.content.lower() in ['y','n']
+        return m.author == member and m.channel == ctx.channel and m.content.lower() in ['y','n']
 
     try :
         message = await bot.wait_for('message',check=check, timeout=30.0)
@@ -353,14 +403,14 @@ async def battle(ctx, member: discord.Member ,amount=None):
             if random.randrange(2) == 0 : #author wins
                 em = discord.Embed(title=f"{ctx.author.name} won",description=f"{ctx.author.mention} won and earned {amount} coins", color=discord.Color.green())
                 await ctx.channel.send(embed=em)
-                await update_bank(ctx.author, amount) #adding the amount to the wallet of the author
-                await update_bank(member, -1*amount) #substracting the ammount from the wallet of the member
+                data.update_one({'_id':ctx.author.id}, {'$inc': {'wallet' : amount }}) #adding the amount to the wallet of the author
+                data.update_one({'_id':member.id}, {'$inc': {'wallet' : -amount }})  #substracting the ammount from the wallet of the member
                 return
             else : #memebr wins
                 em = discord.Embed(title=f"{member.display_name} won",description=f"{member.mention} won and earned {amount} coins", color=discord.Color.green())
                 await ctx.channel.send(embed=em)
-                await update_bank(member, amount) #adding the amount to the wallet of the member
-                await update_bank(ctx.author, -1*amount) #substracting the ammount from the wallet of the author
+                data.update_one({'_id':ctx.author.id}, {'$inc': {'wallet' : -amount }}) #substracting the amount from the wallet of the author
+                data.update_one({'_id':member.id}, {'$inc': {'wallet' : amount }})  #adding the ammount to the wallet of the member
                 return
         elif message.content.lower()=='n':
             em = discord.Embed(title=f"Challenged declined!",description=f"{member.mention} Declined the challenge", color=0xe74c3c)
@@ -371,77 +421,38 @@ async def battle(ctx, member: discord.Member ,amount=None):
         em = discord.Embed(title=f" ❌ Error!",description=f"{member.mention} did not respond", color=0xe74c3c)
         await ctx.channel.send(embed=em)
 
-      
-            
 
+#functions 
+async def open_account(member):
+    user = data.find_one({'_id':member.id})
 
-#error beg
-@beg.error
-async def beg(ctx, error):
-    if isinstance(error, commands.CommandOnCooldown):
-        t = float("{:.2f}".format(error.retry_after))
-        t = str(timedelta(seconds=t))[2:7].replace(':','min')
-        em = discord.Embed(title=f"Slow it down !",description=f"You can use this command once every 30mins.\n Try again in {t}s.", color=0xe74c3c)
-        await ctx.send(embed=em)
-
-
-#error work 
-@work.error
-async def work(ctx, error):
-    if isinstance(error, commands.CommandOnCooldown):
-        t = float("{:.2f}".format(error.retry_after))
-        t = str(timedelta(seconds=t))[2:7].replace(':','min')
-        em = discord.Embed(title=f"Slow it down !",description=f"You can use this command once every 30mins.\n Try again in {t}s.", color=0xe74c3c)
-        await ctx.send(embed=em) 
-
-#error battle
-@battle.error
-async def battle(ctx, error):
-    if isinstance(error, commands.CommandOnCooldown):
-        t = float("{:.2f}".format(error.retry_after))
-        t = str(timedelta(seconds=t))[2:7].replace(':','min')
-        em = discord.Embed(title=f"Slow it down !",description=f"You can use this command once every 30mins.\n Try again in {t}s.", color=0xe74c3c)
-        await ctx.send(embed=em)
-
-
-
-#functions
-async def open_account(user):
+    if user == None:
+        data.insert_one({'_id':member.id, 'name': member.name, 'wallet': 0, 'bank': 0, 'pfp': member.avatar.url})
     
-    users = await get_bank_data()
-
-    if str(user.id) in users :
-        return False
-    else :
-        users[str(user.id)] = {}
-        users[str(user.id)]["wallet"] = 0
-        users[str(user.id)]["bank"] = 0
-
-    with open("mainbank.json", 'w') as f:
-        json.dump(users, f)
     return True
 
+async def get_balance(member):
 
-async def get_bank_data():
-    with open("mainbank.json", 'r') as f:
-        users = json.load(f)
-    
-    return users
-
-async def update_bank(user, change=0, mode='wallet'):
-    users = await get_bank_data()
-
-    users[str(user.id)][mode] += change
-    
-    with open("mainbank.json", 'w') as f:
-        json.dump(users, f)
-    
-    bal = [users[str(user.id)]['wallet'], users[str(user.id)]['bank']]
+    user = data.find_one({"_id":member.id})
+    bal = user['wallet'], user['bank']
     
     return bal
 
-        
+async def convert(time):
+    # [d,h,m,s]
+    t = [re.search(r'\d+j',time), re.search(r'\d+h',time), re.search(r'\d+m',time), re.search(r'\d+s',time)] 
 
+    for i in range(len(t)):
+        if t[i] :
+            t[i] = int(t[i].group(0)[:-1])
+        else :
+            t[i] = 0
 
-token = 'OTMzMTE0NTgxODY4NDk0OTE4.Yec0rA.BZCe0BJ8Su301Xcqe-1iDAJUMHs'
+    print(t)
+
+    converted_time = t[0]*86400+t[1]*3600+t[2]*60+t[3]
+
+    return converted_time
+
+token = 'MTAxODMwMzIwMTYzNzgzNDgxMg.Gp9WEd.DoiapX6oi5pWaSIsS1avREQejJ-UE13ACH0nJU'
 bot.run(token)
