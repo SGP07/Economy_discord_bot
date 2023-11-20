@@ -429,5 +429,5 @@ async def convert(time):
 
     return converted_time
 
-token = 'MTAxODMwMzIwMTYzNzgzNDgxMg.Gp9WEd.DoiapX6oi5pWaSIsS1avREQejJ-UE13ACH0nJU'
+token = 'TOKEN'
 bot.run(token)
