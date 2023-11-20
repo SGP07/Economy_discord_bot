@@ -31,7 +31,8 @@ The Bushicro Discord Bot is a versatile and engaging Discord bot that includes a
 
 3. **Dependencies Installation**: Install the required Python packages using:
    ```bash
-   pip install discord.py pymongo```
+   pip install discord.py pymongo
+   ```
 
 ## Usage
 1. **Invite the Bot**: Invite the bot to your Discord server using the provided [invite link](your_bot_invite_link).
