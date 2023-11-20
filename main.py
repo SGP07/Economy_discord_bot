@@ -12,7 +12,7 @@ import re
 os.chdir('/home/sgp/Documents/Dev/bushicro')
 
 
-client = MongoClient("mongodb+srv://sgp:ZlftinxAqHT6HGXN@cluster0.ofvgrfi.mongodb.net/?retryWrites=true&w=majority")
+client = MongoClient("..")
 db = client["discord"]
 data = db["mainbank"]
 
